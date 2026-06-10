@@ -1,4 +1,8 @@
-# xhs-matrix · 小红书 AI 矩阵运营系统
+<p align="center">
+  <img src="assets/logo.png" width="120" alt="logo">
+</p>
+
+<h1 align="center">xhs-matrix · 小红书 AI 矩阵运营系统</h1>
 
 > 采集竞品/热点 → AI 分析选题 → 按人设 + 产品知识库原创图文与配图 → 多账号像真人一样自动发布。
 > 本地桌面应用（Electron），同源托管前端，支持局域网多人浏览器访问。数据全部存在本机，安全可控。
@@ -19,6 +23,16 @@
 - **发布日历**：拟人逐字填写、错峰、发布时段；可「人工确认发布」也可全自动
 - **模型网关**：OpenAI 兼容 + Gemini，多供应商多模型，支持 Claude 缓存（文本 + 生图统一）
 - **运行记录 / 开机自启 / 局域网共享**
+
+## 🖼️ 界面预览
+
+| 总控台（项目制流水线） | 采集（关键词/竞品/热点） |
+| :---: | :---: |
+| <img src="assets/screenshots/dashboard.png" width="420"> | <img src="assets/screenshots/collect.png" width="420"> |
+
+| 人设 / 产品库 |
+| :---: |
+| <img src="assets/screenshots/persona.png" width="420"> |
 
 ## 🧱 技术栈
 
