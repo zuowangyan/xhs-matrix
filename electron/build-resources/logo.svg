@@ -1,0 +1,39 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF3355"/>
+      <stop offset="1" stop-color="#FF5E7E"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#9E0B25" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- 背景 squircle -->
+  <rect x="16" y="16" width="480" height="480" rx="116" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="116" fill="url(#sheen)"/>
+
+  <!-- 笔记卡片矩阵（层叠，代表内容矩阵） -->
+  <g filter="url(#shadow)">
+    <!-- 后卡 -->
+    <rect x="150" y="158" width="232" height="150" rx="30" transform="rotate(-12 266 233)" fill="#FFFFFF" fill-opacity="0.38"/>
+    <!-- 中卡 -->
+    <rect x="150" y="178" width="232" height="160" rx="30" transform="rotate(-6 266 258)" fill="#FFFFFF" fill-opacity="0.66"/>
+    <!-- 前卡 -->
+    <rect x="146" y="206" width="240" height="176" rx="32" fill="#FFFFFF"/>
+    <!-- 前卡上的文字占位线 -->
+    <rect x="178" y="250" width="150" height="20" rx="10" fill="#FF3355" fill-opacity="0.85"/>
+    <rect x="178" y="290" width="176" height="16" rx="8" fill="#FF7088" fill-opacity="0.55"/>
+    <rect x="178" y="320" width="120" height="16" rx="8" fill="#FF7088" fill-opacity="0.55"/>
+  </g>
+
+  <!-- AI 星芒 -->
+  <g transform="translate(360 168)">
+    <path d="M0 -40 C6 -12 12 -6 40 0 C12 6 6 12 0 40 C-6 12 -12 6 -40 0 C-12 -6 -6 -12 0 -40 Z" fill="#FFFFFF"/>
+    <circle cx="52" cy="-44" r="8" fill="#FFFFFF" fill-opacity="0.9"/>
+  </g>
+</svg>

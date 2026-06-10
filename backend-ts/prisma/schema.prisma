@@ -1,0 +1,331 @@
+// 小红书 AI 矩阵运营系统 - 数据模型
+// Prisma 7 + better-sqlite3 driver adapter（datasource 不写 url，由 PrismaService 注入 adapter）
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ===================== 模型网关（对齐 guada：供应商配置 + 用户模型）=====================
+// 用户配置的供应商实例：选内置模板或自定义，含 协议 / 地址 / 密钥
+model ModelProvider {
+  id        String   @id @default(cuid())
+  name      String // 显示名，如「我的DeepSeek」
+  provider  String // 内置模板key（deepseek/openai/anthropic…）或 "custom"
+  protocol  String?  @default("openai") // openai | openai-response | gemini | anthropic
+  apiUrl    String   @map("api_url")
+  apiKey    String?  @map("api_key")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  models    Model[]
+
+  @@map("model_providers")
+}
+
+// 用户自行添加的模型（可多个），区分 文本/生图/向量
+model Model {
+  id         String        @id @default(cuid())
+  providerId String        @map("provider_id")
+  name       String? // 别名
+  modelName  String        @map("model_name") // 实际模型名
+  modelType  String        @default("text") @map("model_type") // text | image | embedding
+  isActive   Boolean       @default(true) @map("is_active")
+  createdAt  DateTime      @default(now()) @map("created_at")
+  provider   ModelProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@map("models")
+}
+
+// ===================== 运营项目（串联主线）=====================
+// Campaign 是把所有模块串起来的"上下文"：抓什么/写哪个产品/用哪个采集号/发哪几个号/节奏，全在这里定。
+// 所有产物（采集/选题/草稿/发布）都挂 campaignId，形成可追溯的产物链。
+model Campaign {
+  id                String   @id @default(cuid())
+  name              String
+  status            String   @default("active") // active | paused | archived
+  // 运行模式：手动(每步确认) | 半自动(只把关草稿) | 全自动(无人值守)
+  runMode           String   @default("semi") // manual | semi | auto
+  // 各闸门覆盖（JSON）：{collectReview, topicReview, draftReview, publishReview} 每个 auto|manual
+  gates             String   @default("{}")
+  // —— 上下文：回答"怎么决定的" ——
+  productName       String? // 目标产品（产品库 Wiki 里的产品名）
+  personaId         String? // 绑定人设
+  collectAccountIds String   @default("[]") // JSON 采集账号id
+  publishAccountIds String   @default("[]") // JSON 发布账号id
+  keywords          String   @default("[]") // JSON 采集关键词
+  competitors       String   @default("[]") // JSON 竞品账号
+  playbook          String? // 玩法 skill（种草/测评/教程…）
+  cadence           String   @default("{}") // JSON 节奏：{everyHours, dailyMax, ...}
+  autopilotEnabled  Boolean  @default(false) @map("autopilot_enabled") // 全自动开关
+  lastRunAt         DateTime? @map("last_run_at")
+  nextRunAt         DateTime? @map("next_run_at") // 下次计划运行(区间随机)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("campaigns")
+}
+
+// 编排运行日志（监控用）
+model RunLog {
+  id         String   @id @default(cuid())
+  campaignId String   @map("campaign_id")
+  stage      String // collect | synthesize | analysis | generate | publish | done | error
+  status     String // ok | skip | error
+  detail     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([campaignId])
+  @@map("run_logs")
+}
+
+// ===================== 账号矩阵 =====================
+model Account {
+  id            String   @id @default(cuid())
+  nickname      String
+  role          String // "collector" 采集号 | "publisher" 发文号
+  status        String   @default("login_required") // active | cooldown | banned | login_required
+  cookie        String? // 加密存储
+  fingerprintId String?  @map("fingerprint_id")
+  proxyId       String?  @map("proxy_id") // 直连方案留空
+  personaId     String?  @map("persona_id")
+  warmupLevel   Int      @default(0) @map("warmup_level") // 养号成熟度 0-100
+  dailyQuota    Int      @default(2) @map("daily_quota") // 每日发布上限
+  activeWindow  String?  @map("active_window") // JSON 活跃时段（拟人错峰）
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("accounts")
+}
+
+model Fingerprint {
+  id        String   @id @default(cuid())
+  ua        String
+  viewport  String
+  timezone  String
+  language  String
+  webgl     String // JSON
+  canvas    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("fingerprints")
+}
+
+// 直连方案默认不启用；扩量时再开 enabled
+model Proxy {
+  id       String  @id @default(cuid())
+  type     String // http | socks5
+  host     String
+  port     Int
+  username String?
+  password String?
+  region   String?
+  healthy  Boolean @default(true)
+  enabled  Boolean @default(false)
+
+  @@map("proxies")
+}
+
+// ===================== 采集数据 =====================
+model CollectTask {
+  id         String   @id @default(cuid())
+  campaignId String?  @map("campaign_id")
+  type       String // keyword | competitor | hot
+  query      String
+  accountId  String   @map("account_id")
+  status     String   @default("pending") // pending | running | done | failed
+  result     String? // JSON 摘要/错误
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([campaignId])
+  @@map("collect_tasks")
+}
+
+model Note {
+  id          String    @id // 小红书 note id
+  campaignId  String?   @map("campaign_id")
+  title       String
+  content     String
+  authorId    String    @map("author_id")
+  authorName  String    @map("author_name")
+  likes       Int       @default(0)
+  collects    Int       @default(0)
+  comments    Int       @default(0)
+  images      String    @default("[]") // JSON 图片URL数组
+  tags        String    @default("[]") // JSON
+  publishTime DateTime? @map("publish_time")
+  collectedAt DateTime  @default(now()) @map("collected_at")
+  source      String // 哪个采集任务/关键词
+
+  @@map("notes")
+}
+
+model Comment {
+  id       String @id
+  noteId   String @map("note_id")
+  content  String
+  likes    Int    @default(0)
+  authorId String @map("author_id")
+
+  @@index([noteId])
+  @@map("comments")
+}
+
+// 高频评论聚类结果（分析产物）
+model CommentInsight {
+  id         String  @id @default(cuid())
+  campaignId String? @map("campaign_id")
+  topic      String // 痛点/关键词主题
+  keywords  String   @default("[]") // JSON
+  frequency Int      @default(0)
+  sampleIds String   @default("[]") @map("sample_ids") // JSON 代表性评论id
+  source    String // 关联关键词/竞品
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("comment_insights")
+}
+
+// ===================== 人设 & 知识库 =====================
+// 人设结构化旋钮（深度知识放 Wiki）
+model Persona {
+  id           String   @id @default(cuid())
+  name         String
+  tone         String   @default("")
+  positioning  String   @default("")
+  audience     String   @default("")
+  taboo        String   @default("")
+  signature    String   @default("")
+  hashtags     String   @default("[]") // JSON
+  wikiSpaceIds String   @default("[]") @map("wiki_space_ids") // JSON 绑定的 Wiki 空间id
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("personas")
+}
+
+// LLM Wiki（复用 guada 思路）：空间 -> 页面（树形）
+model WikiSpace {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  template    String? // general | persona | product | custom
+  createdAt   DateTime   @default(now()) @map("created_at")
+  pages       WikiPage[]
+
+  @@map("wiki_spaces")
+}
+
+model WikiPage {
+  id          String     @id @default(cuid())
+  spaceId     String     @map("space_id")
+  parentId    String?    @map("parent_id") // 自引用，树形
+  title       String
+  content     String     @default("") // Markdown
+  // LLM Wiki 三层语义：category(分类) / source(原始素材) / entity(实体) / topic(主题) / synthesis(综合)
+  pageType    String     @default("topic") @map("page_type")
+  // 置信度：EXTRACTED(直接来自资料) / INFERRED(推理) / AMBIGUOUS(冲突) / UNVERIFIED(待验证)
+  confidence  String?
+  tags        String? // 逗号分隔多维标签（决定检索命中率）
+  contentHash String?    @map("content_hash") // 去重
+  order       Int        @default(0)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  space       WikiSpace  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  parent      WikiPage?  @relation("PageTree", fields: [parentId], references: [id])
+  children    WikiPage[] @relation("PageTree")
+
+  @@index([spaceId])
+  @@index([parentId])
+  @@index([pageType])
+  @@map("wiki_pages")
+}
+
+// ===================== 选题 & 生成 =====================
+model Topic {
+  id         String   @id @default(cuid())
+  campaignId String?  @map("campaign_id")
+  title      String
+  angle      String   @default("") // 切入角度
+  rationale String   @default("") // 数据依据
+  hotScore  Float    @default(0) @map("hot_score")
+  status    String   @default("candidate") // candidate | adopted | discarded
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("topics")
+}
+
+model Draft {
+  id               String   @id @default(cuid())
+  campaignId       String?  @map("campaign_id")
+  topicId          String?  @map("topic_id")
+  personaId        String   @map("persona_id")
+  accountId        String?  @map("account_id")
+  playbook         String? // 玩法 skill：种草/测评/教程/对比
+  title            String
+  body             String
+  images           String   @default("[]") // JSON 本地图片路径
+  hashtags         String   @default("[]") // JSON
+  complianceChecked Boolean @default(false) @map("compliance_checked")
+  status           String   @default("ready") // generating | ready | scheduled | published | failed
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("drafts")
+}
+
+// ===================== 发布 & 养号 =====================
+model PublishJob {
+  id          String   @id @default(cuid())
+  campaignId  String?  @map("campaign_id")
+  draftId     String   @map("draft_id")
+  accountId   String   @map("account_id")
+  scheduledAt DateTime @map("scheduled_at") // 拟人随机化后的发布时间
+  status      String   @default("scheduled") // scheduled | publishing | published | failed
+  result      String? // note url / 失败原因
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([accountId])
+  @@map("publish_jobs")
+}
+
+model WarmupAction {
+  id        String   @id @default(cuid())
+  accountId String   @map("account_id")
+  action    String // browse | like | follow | comment | search
+  detail    String?
+  at        DateTime @default(now())
+
+  @@index([accountId])
+  @@map("warmup_actions")
+}
+
+// ===================== 图库（用户上传素材）=====================
+model Material {
+  id         String   @id @default(cuid())
+  campaignId String?  @map("campaign_id") // null = 全局通用
+  url        String // /materials/xxx
+  name       String?
+  tags       String? // 逗号分隔
+  width      Int?
+  height     Int?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([campaignId])
+  @@map("materials")
+}
+
+// ===================== 设置 =====================
+model Setting {
+  group     String
+  key       String
+  value     String // JSON
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([group, key])
+  @@map("settings")
+}

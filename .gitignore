@@ -1,0 +1,15 @@
+node_modules/
+dist/
+data/
+runtime/
+_pkg*/
+*.log
+*.zip
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.local
+.DS_Store
+*.local
+小红书矩阵.exe

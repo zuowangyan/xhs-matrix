@@ -1,0 +1,15 @@
+{
+  "name": "xhs-matrix-electron",
+  "productName": "小红书矩阵",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "png-to-ico": "^2.1.8",
+    "sharp": "^0.34.5"
+  }
+}
